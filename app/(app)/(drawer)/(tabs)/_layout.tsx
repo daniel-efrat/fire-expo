@@ -1,13 +1,10 @@
 import { Tabs } from "expo-router";
 import React from "react";
 import { useNavigation } from "expo-router";
-import { Ionicons } from "@expo/vector-icons"; // or your icon library
+import { Ionicons } from "@expo/vector-icons";
 import { Pressable } from "react-native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
-
 import { TabBarIcon } from "@/components/navigation/TabBarIcon";
-import { Colors } from "@/constants/Colors";
-import { useColorScheme } from "@/hooks/useColorScheme";
 
 /**
  * TabLayout manages the bottom tab navigation while integrating with a drawer menu.
@@ -16,13 +13,21 @@ import { useColorScheme } from "@/hooks/useColorScheme";
  * - The tab navigation is nested inside the drawer
  */
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const navigation = useNavigation<DrawerNavigationProp<any>>();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: '#3B82F6', // primary color
+        tabBarInactiveTintColor: '#9CA3AF', // text-secondary-dark
+        tabBarStyle: {
+          backgroundColor: '#111827', // bg-background-dark
+          borderTopColor: '#374151', // border-dark
+        },
+        headerStyle: {
+          backgroundColor: '#111827', // bg-background-dark
+        },
+        headerTintColor: '#F9FAFB', // text-dark
         headerShown: true,
         /**
          * Add hamburger menu button to all tab headers by default
@@ -34,7 +39,7 @@ export default function TabLayout() {
             onPress={() => navigation.openDrawer()}
             style={{ marginLeft: 16 }}
           >
-            <Ionicons name="menu" size={24} color="black" />
+            <Ionicons name="menu" size={24} color="#F9FAFB" />
           </Pressable>
         ),
       }}
@@ -52,14 +57,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="productions"
         options={{
           // Override to remove menu button for this specific screen
           headerLeft: () => null,
-          title: "Explore",
+          title: "Productions",
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
-              name={focused ? "code-slash" : "code-slash-outline"}
+              name={focused ? "film" : "film-outline"}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          // Override to remove menu button for this specific screen
+          headerLeft: () => null,
+          title: "Profile",
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon
+              name={focused ? "person" : "person-outline"}
               color={color}
             />
           ),

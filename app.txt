@@ -1,0 +1,253 @@
+Production Management App – Comprehensive Guide
+===============================================
+
+This document provides detailed, step-by-step instructions for building a full-featured Production Management App using Expo with TypeScript, Expo Router for navigation, and NativeWind for styling. The app targets iOS, Android, and Web, and uses Firebase for Authentication, Firestore for data storage, and Firebase Storage for avatar uploads.
+
+------------------
+3. Firestore Data Structure
+-------------------------------------------------------------------------------
+
+A. Unified Profiles Collection
+------------------------------
+Collection: profiles
+Document ID: Firebase Authentication UID.
+Fields:
+  - id: string (same as auth UID)
+  - email: string
+  - username: string
+  - full_name: string
+  - avatar_url: string (URL from Firebase Storage)
+  - created_at: timestamp
+
+Example Document:
+{
+  "id": "AUTH_USER_ID",
+  "email": "user@example.com",
+  "username": "johndoe",
+  "full_name": "John Doe",
+  "avatar_url": "https://firebasestorage.googleapis.com/your_storage_path/avatar.jpg",
+  "created_at": "2025-01-31T12:34:56Z"
+}
+
+B. Productions Collection
+-------------------------
+Collection: productions
+Document ID: Unique identifier (UUID or auto-generated).
+Fields:
+  - id: string
+  - title: string
+  - producer: string
+  - created_by: string (refers to profiles/{id})
+  - created_at: timestamp
+
+Example Document:
+{
+  "id": "PRODUCTION_UUID",
+  "title": "Production Title",
+  "producer": "Producer Name",
+  "created_by": "AUTH_USER_ID",
+  "created_at": "2025-01-31T12:34:56Z"
+}
+
+C. Production Assignments (Linking Profiles to Productions)
+------------------------------------------------------------
+Subcollection: /productions/{productionId}/assignments
+Document ID: Unique identifier (UUID).
+Fields:
+  - id: string
+  - profile_id: string (reference to profiles/{profile_id})
+  - role: string (e.g., "cast" or "creative")
+  - status: string (e.g., "active", "pending", "archived")
+  - assigned_at: timestamp
+
+Example Document:
+{
+  "id": "ASSIGNMENT_UUID",
+  "profile_id": "AUTH_USER_ID",
+  "role": "cast",
+  "status": "active",
+  "assigned_at": "2025-01-31T12:34:56Z"
+}
+
+D. Production-Scoped Data
+-------------------------
+Within each production document, create additional subcollections:
+
+1. Scenes:
+   Subcollection: /productions/{productionId}/scenes
+   Fields:
+     - id: string
+     - act_number: number
+     - scene_number: number
+     - start_page: number
+     - end_page: number
+     - created_at: timestamp
+
+2. Schedule (with Nested Subcollections):
+   Subcollection: /productions/{productionId}/schedule
+   Under schedule, create nested subcollections:
+     - Time Slots: /productions/{productionId}/schedule/time_slots
+         Fields: id, start_time, end_time, created_at
+     - Agenda: /productions/{productionId}/schedule/agenda
+         Fields: as needed (e.g., agenda items, descriptions)
+     - No-Gos: /productions/{productionId}/schedule/no_gos
+         Fields: id, date, start_time, end_time, comment, created_at
+     - Final Schedule: /productions/{productionId}/schedule/final_schedule
+         Fields: as needed (aggregated schedule info)
+
+-------------------------------------------------------------------------------
+4. UI Structure & Navigation with Expo Router
+-------------------------------------------------------------------------------
+
+A. Global Navigation
+--------------------
+Use Expo Router’s file-based navigation with the following structure for global tabs (visible on every screen):
+
+Global Tabs (Bottom Navigation):
+  - Home: app/(tabs)/home.tsx
+  - Productions: app/(tabs)/productions.tsx
+  - Profile: app/(tabs)/profile.tsx
+
+These tabs remain visible on every screen (iOS, Android, and Web).
+
+B. Productions Screen
+----------------------
+Purpose: Display a list of all productions involving the current user (created by them or where they are a member).
+File: app/(tabs)/productions.tsx
+Functionality: Query Firestore for productions where the current user's UID is either in the "created_by" field or exists in a production’s /assignments subcollection.
+
+C. Production Detail Page & Layout
+------------------------------------
+When a production is tapped, navigate to its detail page:
+Route: app/productions/[id]/
+Important files:
+   1. app/productions/_layout.tsx
+      - This layout file wraps all routes under the "productions" folder.
+      - It can be used to fetch common production data and provide shared navigation.
+   2. app/productions/index.tsx
+      - Lists all productions (if needed, e.g., for administrative purposes).
+   3. app/productions/[id]/index.tsx
+      - Production Detail Page: Displays details for a specific production.
+      - This page should include nested tabs for:
+         - Cast (app/productions/[id]/cast.tsx)
+         - Creative (app/productions/[id]/creative.tsx)
+         - Scenes (app/productions/[id]/scenes.tsx)
+         - Schedule (app/productions/[id]/schedule.tsx)
+
+D. Schedule Screen Nested Navigation
+--------------------------------------
+Within the Production Detail's Schedule tab:
+Create nested top tabs for:
+   - Time Slots: app/productions/[id]/schedule/time_slots.tsx
+   - Agenda: app/productions/[id]/schedule/agenda.tsx
+   - No-Gos: app/productions/[id]/schedule/no_gos.tsx
+   - Final Schedule: app/productions/[id]/schedule/final_schedule.tsx
+Use Expo Router's nested layouts to display a top navbar for these schedule views.
+
+-------------------------------------------------------------------------------
+5. Detailed Implementation Instructions
+-------------------------------------------------------------------------------
+
+A. Project Initialization & File Structure
+--------------------------------------------
+1. Initialize the Expo project using the TypeScript template.
+2. Install dependencies (Expo Router, Firebase, NativeWind).
+3. Organize files with a structure similar to:
+
+ProductionManager/
+├── app/
+│   ├── (tabs)/
+│   │   ├── home.tsx
+│   │   ├── productions.tsx
+│   │   └── profile.tsx
+│   ├── productions/
+│   │   ├── _layout.tsx         // Layout for all production routes
+│   │   ├── index.tsx           // (Optional) List of all productions (if needed)
+│   │   └── [id]/
+│   │       ├── index.tsx       // Production Detail Page with nested tabs
+│   │       ├── cast.tsx        // Cast tab content
+│   │       ├── creative.tsx    // Creative tab content
+│   │       ├── scenes.tsx      // Scenes tab content
+│   │       └── schedule.tsx    // Schedule tab wrapper
+│   │           └── schedule/    // Nested schedule tabs folder
+│   │               ├── time_slots.tsx
+│   │               ├── agenda.tsx
+│   │               ├── no_gos.tsx
+│   │               └── final_schedule.tsx
+├── src/
+│   └── firebase/
+│       └── firebaseConfig.ts
+├── tailwind.config.js
+└── app.config.ts (or app.json)
+
+B. Firebase Integration
+-----------------------
+- Set up Firebase as described in Section 2.
+- Implement authentication flows (sign-up/sign-in).
+- For avatar uploads, use Expo’s ImagePicker to select an image, upload it to Firebase Storage, and save the URL in the user's "avatar_url" field in the "profiles" collection.
+
+C. Navigation Implementation with Expo Router
+-----------------------------------------------
+- Global Tabs:
+   Create files under app/(tabs) for Home, Productions, and Profile screens.
+- Production Detail:
+   In app/productions/[id]/index.tsx, set up a layout that includes nested top tabs for Cast, Creative, Scenes, and Schedule.
+- Nested Schedule Tabs:
+   Under app/productions/[id]/schedule/, implement Time Slots, Agenda, No-Gos, and Final Schedule screens with a top navbar for navigation.
+
+D. UI & Styling with NativeWind
+-------------------------------
+- Use NativeWind classes for styling. For example:
+   import { View, Text } from 'react-native';
+
+   export default function HomeScreen() {
+     return (
+       <View className="flex-1 bg-white p-4">
+         <Text className="text-xl font-bold">Home Screen</Text>
+       </View>
+     );
+   }
+- Ensure consistent styling across iOS, Android, and Web.
+
+E. Data Fetching & Security
+---------------------------
+- In the Productions screen, query Firestore for productions where the current user is either the creator (created_by) or a member (exists in /assignments).
+- Write Firestore security rules to enforce:
+   - Users can only update their own profiles.
+   - Only production admins (or authorized members) can modify production-specific data.
+
+Example Security Rule (Pseudocode):
+   match /productions/{productionId} {
+     allow read: if true;
+     allow create: if request.auth != null;
+     allow update, delete: if request.auth != null && request.auth.uid == resource.data.created_by;
+
+     match /assignments/{assignmentId} {
+       allow create, update, delete: if request.auth != null &&
+         request.auth.uid == get(/databases/$(database)/documents/productions/$(productionId)).data.created_by;
+       allow read: if true;
+     }
+   }
+
+F. Testing & Debugging
+----------------------
+- Test the app on iOS, Android, and Web.
+- Verify that global navigation (Home, Productions, Profile) remains visible.
+- Ensure that the Productions screen lists the appropriate productions.
+- Confirm that the Production Detail page displays nested tabs correctly.
+- Test avatar uploads and all Firestore integrations.
+
+-------------------------------------------------------------------------------
+6. Final Notes
+-------------------------------------------------------------------------------
+
+- Code Quality & Comments:
+   Write clean, modular, well-commented TypeScript code.
+
+- Extensibility:
+   Design the architecture to easily add new features (e.g., advanced scheduling options or additional production metadata).
+
+- Documentation:
+   Maintain updated documentation for future developers regarding the Firestore structure, Firebase integration, and Expo Router navigation.
+
+Happy coding!

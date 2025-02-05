@@ -4,10 +4,10 @@
  * @module
  */
 import { initializeApp } from "firebase/app";
-
-// IGNORE IMPORT ERROR, this is a valid import, still investigating
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { Platform } from "react-native";
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
+import { getAuth, initializeAuth, browserLocalPersistence, Auth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // ============================================================================
 // Configuration
@@ -38,11 +38,22 @@ const app = initializeApp(firebaseConfig);
 
 /**
  * Initialize Firebase Authentication service
- * @type {Auth}
  */
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-});
+let auth: Auth;
+if (Platform.OS === 'web') {
+  auth = initializeAuth(app, {
+    persistence: browserLocalPersistence
+  });
+} else {
+  // For React Native, dynamically import the persistence
+  const { getReactNativePersistence } = require("firebase/auth");
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+  });
+}
 
-export { auth };
+const db = getFirestore(app);
+
+export { auth, db };
+export type { Auth };
 export default app;

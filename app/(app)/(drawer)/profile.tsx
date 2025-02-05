@@ -24,20 +24,20 @@ const ProfileScreen = () => {
   // ============================================================================
 
   return (
-    <View className="flex-1 mt-4 p-4">
+    <View className="flex-1 p-4 bg-background-dark">
       {/* Welcome Section */}
       <View className="mb-8">
-        <Text className="text-xl font-bold text-blue-900">
-          Name: {displayName}
+        <Text className="text-xl font-bold text-text-dark">
+          Name: <Text className="text-primary">{displayName}</Text>
         </Text>
-        <Text className="text-xl font-semibold  text-blue-900 mt-2">
-          Email: {user?.email}
+        <Text className="text-xl font-semibold text-text-dark mt-4">
+          Email: <Text className="text-primary">{user?.email}</Text>
         </Text>
-        <Text className="text-normL font-semibold  text-blue-900 mt-2">
-          Last Seen: {user?.metadata?.lastSignInTime}
+        <Text className="text-base text-text-secondary-dark mt-4">
+          Last Seen: <Text className="text-primary">{user?.metadata?.lastSignInTime}</Text>
         </Text>
-        <Text className="text-normal font-semibold  text-blue-900 mt-2">
-          Created: {user?.metadata?.creationTime}
+        <Text className="text-base text-text-secondary-dark mt-4">
+          Created: <Text className="text-primary">{user?.metadata?.creationTime}</Text>
         </Text>
       </View>
     </View>
