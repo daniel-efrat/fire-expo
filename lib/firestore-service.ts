@@ -5,6 +5,7 @@
  */
 
 import { 
+  deleteDoc,
   collection,
   query,
   where,
@@ -19,7 +20,26 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase-config';
 
-// ============================================================================
+/**
+ * Updates a cast member's details in a production
+ * @param {string} productionId - The ID of the production
+ * @param {string} castMemberId - The ID of the cast member to update
+ * @param {Omit<CastMember, 'id' | 'created_at'>} data - Updated cast member data
+ * @returns {Promise<void>}
+ */
+export const updateCastMember = async (
+  productionId: string,
+  castMemberId: string,
+  data: Omit<CastMember, 'id' | 'created_at'>
+): Promise<void> => {
+  try {
+    const castRef = doc(db, 'productions', productionId, 'cast_members', castMemberId);
+    await setDoc(castRef, data, { merge: true });
+  } catch (error) {
+    console.error('[error updating cast member] ==>', error);
+    throw error;
+  }
+};
 // Types & Interfaces
 // ============================================================================
 
@@ -158,7 +178,7 @@ export const deleteCastMember = async (
 ): Promise<void> => {
   try {
     const castRef = doc(db, 'productions', productionId, 'cast_members', castMemberId);
-    await setDoc(castRef, {}, { merge: true }); // Soft delete for now
+    await deleteDoc(castRef); // Hard delete
   } catch (error) {
     console.error('[error deleting cast member] ==>', error);
     throw error;

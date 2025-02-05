@@ -1,243 +1,290 @@
-import { View, Text, ScrollView } from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { View, Text, Pressable, ScrollView, TouchableOpacity, Modal, TextInput, } from "react-native";
+import { useLocalSearchParams, router } from "expo-router";
+import { useEffect, useState } from "react";
+import { fetchProductionCastMembers, deleteCastMember, addCastMember, CastMember, updateCastMember } from "@/lib/firestore-service";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  fetchProductionCastMembers,
-  addCastMember,
-  deleteCastMember,
-  CastMember,
-} from "@/lib/firestore-service";
 
 export default function ProductionCastScreen() {
   const { id } = useLocalSearchParams();
   const [castMembers, setCastMembers] = useState<CastMember[]>([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    mode: 'add' | 'edit';
+    memberData?: CastMember;
+  }>({
+    isOpen: false,
+    mode: 'add'
+  });
 
-  // Form state
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [formData, setFormData] = useState({
+    name: '',
+    role: '',
+    email: '',
+    phone: ''
+  });
 
-  // Load cast members
   useEffect(() => {
-    if (typeof id === "string") {
-      loadCastMembers();
+    if (modalState.memberData) {
+      setFormData({
+        name: modalState.memberData.name,
+        role: modalState.memberData.production_role,
+        email: modalState.memberData.email,
+        phone: modalState.memberData.phone || ''
+      });
+    } else {
+      setFormData({
+        name: '',
+        role: '',
+        email: '',
+        phone: ''
+      });
     }
+  }, [modalState.memberData]);
+
+  useEffect(() => {
+    async function loadCastMembers() {
+      if (typeof id !== 'string') return;
+
+      try {
+        setIsLoading(true);
+        const members = await fetchProductionCastMembers(id);
+        setCastMembers(members);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadCastMembers();
   }, [id]);
 
-  const loadCastMembers = async () => {
+  const handleEditMember = (member: CastMember) => {
+    setModalState({
+      isOpen: true,
+      mode: 'edit',
+      memberData: member
+    });
+  };
+
+  const handleDeletePress = (member: CastMember) => {
+    setMemberToDelete({ id: member.id, name: member.name });
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!memberToDelete || typeof id !== 'string') return;
+    
     try {
-      if (typeof id !== "string") return;
-      const members = await fetchProductionCastMembers(id);
-      setCastMembers(members);
+      await deleteCastMember(id, memberToDelete.id);
+      // Refresh the cast members list
+      const updatedMembers = await fetchProductionCastMembers(id);
+      setCastMembers(updatedMembers);
+      setShowDeleteModal(false);
+      setMemberToDelete(null);
     } catch (error) {
-      console.error("[error loading cast members] ==>", error);
-      setError("Failed to load cast members");
+      console.error('Error deleting cast member:', error);
     }
   };
 
-  const handleAddMember = async () => {
-    if (!name || !role || !email) {
-      setError("Name, role, and email are required");
-      return;
-    }
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setMemberToDelete(null);
+  };
+
+  const handleModalSubmit = async (data: { name: string; role: string; email: string; phone?: string }) => {
+    if (typeof id !== 'string') return;
 
     try {
-      if (typeof id !== "string") return;
+      const castData = {
+        ...data,
+        production_role: data.role,
+      };
 
-      await addCastMember(id, {
-        name,
-        production_role: role,
-        email,
-        phone: phone || undefined,
-      });
+      if (modalState.mode === 'edit' && modalState.memberData) {
+        await updateCastMember(id, modalState.memberData.id, castData);
+      } else {
+        await addCastMember(id, castData);
+      }
 
-      // Reset form and close dialog
-      setName("");
-      setRole("");
-      setEmail("");
-      setPhone("");
-      setIsAddDialogOpen(false);
-
-      // Reload cast members
-      loadCastMembers();
+      const updatedMembers = await fetchProductionCastMembers(id);
+      setCastMembers(updatedMembers);
+      setModalState({ isOpen: false, mode: 'add' });
     } catch (error) {
-      console.error("[error adding cast member] ==>", error);
-      setError("Failed to add cast member");
+      console.error('Error saving cast member:', error);
     }
   };
 
-  const handleDeleteMember = async (memberId: string) => {
-    try {
-      if (typeof id !== "string") return;
-      await deleteCastMember(id, memberId);
-      loadCastMembers();
-    } catch (error) {
-      console.error("[error deleting cast member] ==>", error);
-      setError("Failed to delete cast member");
-    }
-  };
-
-  return (
-    <View className="flex-1 bg-gray-900 p-4">
-      {/* Header */}
-      <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-xl font-bold text-white">Cast Members</Text>
-        <Button
-          onPress={() => setIsAddDialogOpen(true)}
-          className="p-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 active:opacity-90"
+  return isLoading ? (
+    <View className="flex-1 justify-center items-center bg-background-dark">
+      <Text className="text-text-dark">Loading...</Text>
+    </View>
+  ) : castMembers.length === 0 ? (
+    <View className="flex-1 justify-center items-center bg-background-dark">
+      <Text className="text-text-dark">No cast members found</Text>
+    </View>
+  ) : (
+    <View className="flex-1 p-4 bg-background-dark">
+      <View className="flex-row justify-between items-center mb-6">
+        <Text className="text-lg font-bold text-text-dark">
+          Production Cast
+        </Text>
+        <Pressable
+          className="px-4 py-2 rounded-lg bg-primary"
+          onPress={() => setModalState({ isOpen: true, mode: "add" })}
         >
-          Add Cast Member
-        </Button>
+          <Text className="text-white">Add Member</Text>
+        </Pressable>
       </View>
-
-      {/* Cast Members List or Empty State */}
-      {castMembers.length === 0 ? (
-        <View className="flex-1 justify-center items-center">
-          <Text className="text-sm text-gray-400 mb-4">
-            No cast members yet
-          </Text>
-          <Button
-            onPress={() => setIsAddDialogOpen(true)}
-            className="p-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 active:opacity-90"
+      <ScrollView>
+        {castMembers.map((member) => (
+          <View
+            key={member.id}
+            className="mb-4 p-4 bg-background-dark border border-border rounded-lg"
           >
-            Add Your First Cast Member
-          </Button>
-        </View>
-      ) : (
-        <ScrollView className="flex-1">
-          <View className="space-y-4">
-            {castMembers.map((member) => (
-              <Card
-                key={member.id}
-                className="p-4 bg-gray-800 rounded-lg border border-gray-700"
+            <View className="flex-row justify-between items-center">
+              <View>
+                <Text className="text-xl font-bold text-text-dark mb-1">
+                  {member.name}
+                </Text>
+                <Text className="text-sm text-text-secondary-dark">
+                  Role: {member.production_role}
+                </Text>
+              </View>
+              <View className="flex-row gap-4">
+                <TouchableOpacity onPress={() => handleEditMember(member)}>
+                  <MaterialIcons name="edit" size={24} color="#3b82f6" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeletePress(member)}>
+                  <MaterialIcons name="delete" size={24} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+      >
+        <View className="flex-1 justify-center items-center bg-black/50">
+          <View className="bg-background-dark p-6 rounded-lg w-[80%] max-w-sm">
+            <Text className="text-lg font-bold text-text-dark mb-4">
+              Confirm Delete
+            </Text>
+            <Text className="text-text-dark mb-6">
+              Are you sure you want to delete {memberToDelete?.name}?
+            </Text>
+            <View className="flex-row justify-end gap-4">
+              <Button
+                style={{ borderRadius: 8, borderWidth: 1, borderColor: "gray" }}
+                variant="outline"
+                onPress={handleCancelDelete}
+                className="text-text-dark"
               >
-                <View className="flex-row justify-between items-start">
-                  <View>
-                    <Text className="text-lg font-bold text-white mb-1">
-                      {member.name}
-                    </Text>
-                    <Text className="text-sm text-gray-400">
-                      {member.production_role}
-                    </Text>
-                    <Text className="text-sm text-gray-400 mt-1">
-                      {member.email}
-                    </Text>
-                    {member.phone && (
-                      <Text className="text-sm text-gray-400">
-                        {member.phone}
-                      </Text>
-                    )}
-                  </View>
-                  <Button
-                    onPress={() => handleDeleteMember(member.id)}
-                    className="p-2 text-red-500 border border-red-500 rounded-lg hover:bg-red-700"
-                  >
-                    Delete
-                  </Button>
-                </View>
-              </Card>
-            ))}
+                Cancel
+              </Button>
+              <Button
+                style={{ borderRadius: 8 }}
+                variant="default"
+                className="bg-red-500 text-white"
+                onPress={handleConfirmDelete}
+              >
+                Delete
+              </Button>
+            </View>
           </View>
-        </ScrollView>
-      )}
+        </View>
+</Modal>
 
-      {/* Add Member Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white">
-              Add Cast Member
-            </DialogTitle>
-            <DialogDescription className="text-sm text-gray-400">
+      <Modal visible={modalState.isOpen} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(26, 26, 26, 0.8)" }}>
+          <View style={{ width: "90%", maxWidth: 400, backgroundColor: "#1a1a1a", padding: 24, borderRadius: 8 }}>
+            <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff", marginBottom: 8 }}>
+              {modalState.mode === 'edit' ? 'Edit Cast Member' : 'Add Cast Member'}
+            </Text>
+            <Text style={{ color: "#aaa", marginBottom: 16 }}>
               Enter the cast member's details below
-            </DialogDescription>
-          </DialogHeader>
+            </Text>
 
-          {error && <Text className="text-red-500 text-sm mb-4">{error}</Text>}
-
-          <View className="space-y-4">
-            <View>
-              <Text className="text-sm font-medium text-white mb-1 ml-1">
-                Name
-              </Text>
-              <Input
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#fff", marginBottom: 4 }}>Name</Text>
+              <TextInput
+                style={{ height: 40, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: "#333", color: "#fff" }}
                 placeholder="Full name"
-                value={name}
-                onChangeText={setName}
-                className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white placeholder-gray-400"
+                value={formData.name}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                placeholderTextColor="#666"
               />
             </View>
 
-            <View>
-              <Text className="text-sm font-medium text-white mb-1 ml-1">
-                Role
-              </Text>
-              <Input
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#fff", marginBottom: 4 }}>Role</Text>
+              <TextInput
+                style={{ height: 40, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: "#333", color: "#fff" }}
                 placeholder="e.g. Lead Actor, Supporting Actor"
-                value={role}
-                onChangeText={setRole}
-                className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white placeholder-gray-400"
+                value={formData.role}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, role: text }))}
+                placeholderTextColor="#666"
               />
             </View>
 
-            <View>
-              <Text className="text-sm font-medium text-white mb-1 ml-1">
-                Email
-              </Text>
-              <Input
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#fff", marginBottom: 4 }}>Email</Text>
+              <TextInput
+                style={{ height: 40, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: "#333", color: "#fff" }}
                 placeholder="email@example.com"
-                value={email}
-                onChangeText={setEmail}
+                value={formData.email}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
                 keyboardType="email-address"
-                className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white placeholder-gray-400"
+                placeholderTextColor="#666"
               />
             </View>
 
-            <View>
-              <Text className="text-sm font-medium text-white mb-1 ml-1">
-                Phone (Optional)
-              </Text>
-              <Input
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#fff", marginBottom: 4 }}>Phone (Optional)</Text>
+              <TextInput
+                style={{ height: 40, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: "#333", color: "#fff" }}
                 placeholder="+1 234 567 8900"
-                value={phone}
-                onChangeText={setPhone}
+                value={formData.phone}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, phone: text }))}
                 keyboardType="phone-pad"
-                className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white placeholder-gray-400"
+                placeholderTextColor="#666"
               />
+            </View>
+
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 12 }}>
+              <Pressable
+                style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: "#333" }}
+                onPress={() => setModalState({ isOpen: false, mode: 'add' })}
+              >
+                <Text style={{ color: "#fff" }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: "#007bff" }}
+                onPress={() => {
+                  if (formData.name && formData.role && formData.email) {
+                    handleModalSubmit({
+                      name: formData.name,
+                      role: formData.role,
+                      email: formData.email,
+                      phone: formData.phone || undefined
+                    });
+                  }
+                }}
+              >
+                <Text style={{ color: "#fff" }}>{modalState.mode === 'edit' ? 'Save Changes' : 'Add Member'}</Text>
+              </Pressable>
             </View>
           </View>
-
-          <DialogFooter>
-            <Button
-              onPress={() => setIsAddDialogOpen(false)}
-              className="p-4 text-white font-semibold border-gray-500 rounded-lg hover:bg-gray-700"
-            >
-              Cancel
-            </Button>
-            <Button
-              onPress={handleAddMember}
-              className="p-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500"
-            >
-              {isLoading ? "Adding..." : "Add Member"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </View>
+      </Modal>
     </View>
   );
 }

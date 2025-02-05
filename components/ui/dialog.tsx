@@ -63,7 +63,7 @@ export function DialogHeader({ children, className }: { children: React.ReactNod
 
 export function DialogTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <View className={cn("text-lg font-semibold", className)}>
+    <View className={cn("text-lg font-semibold text-white", className)}>
       {children}
     </View>
   );
@@ -71,7 +71,7 @@ export function DialogTitle({ children, className }: { children: React.ReactNode
 
 export function DialogDescription({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <View className={cn("text-sm text-muted-foreground", className)}>
+    <View className={cn("text-sm text-text-dark", className)}>
       {children}
     </View>
   );

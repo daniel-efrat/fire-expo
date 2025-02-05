@@ -43,7 +43,8 @@ export function Button({
           className={cn("text-sm font-medium", {
             "text-primary-foreground": variant === "default",
             "text-foreground": variant === "outline" || variant === "ghost",
-          })}
+          }, 
+          className?.match(/(text-\w+(-\w+)*)/)?.[0])}
         >
           {children}
         </Text>
