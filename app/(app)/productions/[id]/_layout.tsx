@@ -48,16 +48,6 @@ export default function ProductionDetailsLayout() {
         }}
       />
       <Tabs.Screen
-        name="screen"
-        options={{
-          title: "Screen",
-          tabBarLabel: "Screen",
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name={focused ? "tv" : "tv-outline"} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="creative"
         options={{
           title: "Creative",

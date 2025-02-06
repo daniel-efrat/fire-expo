@@ -20,26 +20,6 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase-config';
 
-/**
- * Updates a cast member's details in a production
- * @param {string} productionId - The ID of the production
- * @param {string} castMemberId - The ID of the cast member to update
- * @param {Omit<CastMember, 'id' | 'created_at'>} data - Updated cast member data
- * @returns {Promise<void>}
- */
-export const updateCastMember = async (
-  productionId: string,
-  castMemberId: string,
-  data: Omit<CastMember, 'id' | 'created_at'>
-): Promise<void> => {
-  try {
-    const castRef = doc(db, 'productions', productionId, 'cast_members', castMemberId);
-    await setDoc(castRef, data, { merge: true });
-  } catch (error) {
-    console.error('[error updating cast member] ==>', error);
-    throw error;
-  }
-};
 // Types & Interfaces
 // ============================================================================
 
@@ -68,6 +48,19 @@ export interface ProductionAdmin {
  * @interface
  */
 export interface CastMember {
+  id: string;
+  name: string;
+  production_role: string;
+  email: string;
+  phone?: string;
+  created_at: Timestamp;
+}
+
+/**
+ * Creative member data structure
+ * @interface
+ */
+export interface CreativeMember {
   id: string;
   name: string;
   production_role: string;
@@ -109,9 +102,51 @@ export const setUserProfile = async (userId: string, profileData: UserProfile): 
   }
 };
 
+/**
+ * Fetches a user's profile from Firestore
+ * @param {string} userId - The user's ID
+ * @returns {Promise<UserProfile | null>} User profile object or null if not found
+ */
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  try {
+    const userRef = doc(db, 'profiles', userId);
+    const docSnap = await getDoc(userRef);
+    
+    if (!docSnap.exists()) {
+      return null;
+    }
+
+    return docSnap.data() as UserProfile;
+  } catch (error) {
+    console.error('[error fetching user profile] ==>', error);
+    throw error;
+  }
+};
+
 // ============================================================================
 // Cast Member Services
 // ============================================================================
+
+/**
+ * Updates a cast member's details in a production
+ * @param {string} productionId - The ID of the production
+ * @param {string} castMemberId - The ID of the cast member to update
+ * @param {Omit<CastMember, 'id' | 'created_at'>} data - Updated cast member data
+ * @returns {Promise<void>}
+ */
+export const updateCastMember = async (
+  productionId: string,
+  castMemberId: string,
+  data: Omit<CastMember, 'id' | 'created_at'>
+): Promise<void> => {
+  try {
+    const castRef = doc(db, 'productions', productionId, 'cast_members', castMemberId);
+    await setDoc(castRef, data, { merge: true });
+  } catch (error) {
+    console.error('[error updating cast member] ==>', error);
+    throw error;
+  }
+};
 
 /**
  * Adds a new cast member to a production
@@ -155,7 +190,7 @@ export const fetchProductionCastMembers = async (
     const q = query(castRef, orderBy('created_at', 'desc'));
     
     const querySnapshot = await getDocs(q);
-    console.log("[fetchUserProductions] Raw data:", querySnapshot.docs.map(doc => doc.data()));
+    console.log("[fetchProductionCastMembers] Raw data:", querySnapshot.docs.map(doc => doc.data()));
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -185,26 +220,110 @@ export const deleteCastMember = async (
   }
 };
 
-/**
- * Fetches a user's profile from Firestore
- * @param {string} userId - The user's ID
- * @returns {Promise<UserProfile | null>} User profile object or null if not found
- */
-export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-  try {
-    const userRef = doc(db, 'profiles', userId);
-    const docSnap = await getDoc(userRef);
-    
-    if (!docSnap.exists()) {
-      return null;
-    }
+// ============================================================================
+// Creative Member Services
+// ============================================================================
 
-    return docSnap.data() as UserProfile;
+/**
+ * Updates a creative member's details in a production
+ * @param {string} productionId - The ID of the production
+ * @param {string} creativeMemberId - The ID of the creative member to update
+ * @param {Omit<CreativeMember, 'id' | 'created_at'>} data - Updated creative member data
+ * @returns {Promise<void>}
+ */
+export const updateCreativeMember = async (
+  productionId: string,
+  creativeMemberId: string,
+  data: Omit<CreativeMember, 'id' | 'created_at'>
+): Promise<void> => {
+  try {
+    const creativeRef = doc(db, 'productions', productionId, 'creative_members', creativeMemberId);
+    await setDoc(creativeRef, data, { merge: true });
   } catch (error) {
-    console.error('[error fetching user profile] ==>', error);
+    console.error('[error updating creative member] ==>', error);
     throw error;
   }
 };
+
+
+/**
+ * Adds a new creative member to a production
+ * @param {string} productionId - The ID of the production
+ * @param {Omit<CreativeMember, 'id' | 'created_at'>} data - Creative member data
+ * @returns {Promise<CreativeMember>} Created creative member
+ */
+export const addCreativeMember = async (
+  productionId: string,
+  data: Omit<CreativeMember, 'id' | 'created_at'>
+): Promise<CreativeMember> => {
+  try {
+    const creativeRef = collection(db, 'productions', productionId, 'creative_members');
+    const creativeData = {
+      ...data,
+      created_at: Timestamp.now()
+    };
+
+    const docRef = await addDoc(creativeRef, creativeData);
+    
+    return {
+      id: docRef.id,
+      ...creativeData
+    } as CreativeMember;
+  } catch (error) {
+    console.error('[error adding creative member] ==>', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches all creative members for a production
+ * @param {string} productionId - The ID of the production
+ * @returns {Promise<CreativeMember[]>} Array of creative members
+ */
+export const fetchProductionCreativeMembers = async (
+  productionId: string
+): Promise<CreativeMember[]> => {
+  try {
+    console.log("[fetchProductionCreativeMembers] Getting creative members for production:", productionId);
+    const creativeRef = collection(db, 'productions', productionId, 'creative_members');
+    const q = query(creativeRef, orderBy('created_at', 'desc'));
+    
+    const querySnapshot = await getDocs(q);
+    const data = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    console.log("[fetchProductionCreativeMembers] Fetched creative members:", data);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as CreativeMember[];
+  } catch (error) {
+    console.error('[error fetching creative members] ==>', error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes a creative member from a production
+ * @param {string} productionId - The ID of the production
+ * @param {string} creativeMemberId - The ID of the creative member to delete
+ * @returns {Promise<void>}
+ */
+export const deleteCreativeMember = async (
+  productionId: string,
+  creativeMemberId: string
+): Promise<void> => {
+  try {
+    const creativeRef = doc(db, 'productions', productionId, 'creative_members', creativeMemberId);
+    await deleteDoc(creativeRef); // Hard delete
+  } catch (error) {
+    console.error('[error deleting creative member] ==>', error);
+    throw error;
+  }
+};
+
+
 
 // ============================================================================
 // Production Services
